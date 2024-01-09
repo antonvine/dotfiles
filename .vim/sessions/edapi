@@ -1,0 +1,73 @@
+let SessionLoad = 1
+if &cp | set nocp | endif
+let s:so_save = &so | let s:siso_save = &siso | set so=0 siso=0
+let v:this_session=expand("<sfile>:p")
+silent only
+cd ~/work/edapi
+if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
+  let s:wipebuf = bufnr('%')
+endif
+set shortmess=aoO
+badd +43 README.md
+badd +52 test/test_auth.pl
+badd +45 apps/edapi/src/mijk_session.erl
+badd +1 apps/mijk_statist/src/mijk_statist_worker.erl
+badd +6 apps/edapi/include/consts.hrl
+badd +10 apps/edapi/src/mijkweb_dispatch.erl
+badd +31 todo.mkh
+badd +302 apps/edapi/src/user_controller.erl
+badd +26 apps/edapi/src/test_controller.erl
+badd +118 apps/edapi/src/mijkweb_utils.erl
+badd +42 apps/edapi/src/ed_callback_init.erl
+badd +168 apps/edapi/src/model_service_user.erl
+badd +24 apps/edapi/include/mijkweb_consts.hrl
+badd +86 test/test_favorites.pl
+badd +114 apps/edapi/src/mijkweb_session.erl
+badd +44 test/test_user_profile.pl
+badd +67 apps/edapi/src/long_polling.erl
+badd +18 apps/edapi/src/polling_controller.erl
+badd +11 apps/edapi/src/model_page_view.erl
+badd +41 test/test_page_view_stats.pl
+badd +28 apps/edapi/src/model_admin_usergrid.erl
+badd +1 apps/edapi/src/admin_usergrid_controller.erl
+badd +47 test/test_registration.pl
+badd +15 apps/edapi/src/mijkweb_response.erl
+badd +32 static_page_builder.pl
+badd +58 tmpl/mybridalapps.com/index.tmpl
+badd +195 html/buildmachine/api_docs.html
+badd +19 apps/edapi/src/edapi_app.erl
+badd +27 rememberme.sql
+badd +25 patch.sql
+badd +22 edapi.sql
+badd +63 ~/work/bridaldressapp/my-account-portfolio-designer2.html
+badd +22 ~/work/bridaldressapp/js/utils.js
+badd +5 ~/work/bridaldressapp/js/mkh_dfx_init.js
+badd +0 ~/work/bridaldressapp/js/mkh_dz_init.js
+silent! argdel *
+edit ~/work/bridaldressapp/js/mkh_dz_init.js
+set splitbelow splitright
+set nosplitbelow
+set nosplitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+let s:l = 39 - ((38 * winheight(0) + 25) / 51)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+39
+normal! 05|
+tabnext 1
+if exists('s:wipebuf')
+  silent exe 'bwipe ' . s:wipebuf
+endif
+unlet! s:wipebuf
+set winheight=1 winwidth=20 shortmess=filnxtToO
+let s:sx = expand("<sfile>:p:r")."x.vim"
+if file_readable(s:sx)
+  exe "source " . fnameescape(s:sx)
+endif
+let &so = s:so_save | let &siso = s:siso_save
+doautoall SessionLoadPost
+unlet SessionLoad
+" vim: set ft=vim :

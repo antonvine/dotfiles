@@ -1,0 +1,69 @@
+let SessionLoad = 1
+if &cp | set nocp | endif
+let s:so_save = &so | let s:siso_save = &siso | set so=0 siso=0
+let v:this_session=expand("<sfile>:p")
+silent only
+cd ~/work/coleman
+if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
+  let s:wipebuf = bufnr('%')
+endif
+set shortmess=aoO
+badd +28 apps/coleman/src/coleman.app.src
+badd +2 html/js/mkh/index.js
+badd +24 html/js/mkh/signup.js
+badd +138 html/js/js.js
+badd +15 html/index.html
+badd +27 html/referral-page.html
+badd +74 html/sign-up-step2.html
+badd +88 html/js/mkh/utils.js
+badd +36 apps/coleman/src/mijkweb_dispatch.erl
+badd +312 apps/coleman/src/user_controller.erl
+badd +38 html/account_page.html
+badd +61 html/str.html
+badd +33 html/addcc.html
+badd +166 sql_extra.sql
+badd +230 test.sql
+badd +22 apps/coleman/src/model_service_user.erl
+badd +494 db.sql
+badd +91 html/admin.html
+badd +1 apps/coleman/src/admin_controller.erl
+badd +1 apps/coleman/src/admin_userdetails_controller.erl
+badd +37 apps/coleman/src/admin_usergrid_controller.erl
+badd +101 apps/coleman/src/coleman_callback_init.erl
+badd +1 apps/coleman/src/elli_admin_appuserdetails.erl
+badd +153 apps/coleman/src/elli_user_controller.erl
+badd +4 rebar.config
+badd +15 rel/reltool.config
+badd +15 apps/coleman/src/elli_admin_grid.erl
+badd +66 html/js/admin.js
+badd +109 html/mix.html
+badd +5 html/js/mkh/purchase.js
+badd +1 \[BufExplorer]
+silent! argdel *
+edit sql_extra.sql
+set splitbelow splitright
+set nosplitbelow
+set nosplitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+let s:l = 167 - ((7 * winheight(0) + 25) / 51)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+167
+normal! 0
+tabnext 1
+if exists('s:wipebuf')
+  silent exe 'bwipe ' . s:wipebuf
+endif
+unlet! s:wipebuf
+set winheight=1 winwidth=20 shortmess=filnxtToO
+let s:sx = expand("<sfile>:p:r")."x.vim"
+if file_readable(s:sx)
+  exe "source " . fnameescape(s:sx)
+endif
+let &so = s:so_save | let &siso = s:siso_save
+doautoall SessionLoadPost
+unlet SessionLoad
+" vim: set ft=vim :

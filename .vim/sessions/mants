@@ -1,0 +1,52 @@
+let SessionLoad = 1
+if &cp | set nocp | endif
+let s:so_save = &so | let s:siso_save = &siso | set so=0 siso=0
+let v:this_session=expand("<sfile>:p")
+silent only
+cd ~/work/mants
+if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
+  let s:wipebuf = bufnr('%')
+endif
+set shortmess=aoO
+badd +73 apps/mants/src/ws1_handler.erl
+badd +45 apps/mants/src/world_data_handler.erl
+badd +112 static/js/main.js
+badd +1 apps/mants/src/ws_handler.erl
+badd +6 apps/mants/src/mants_defs.erl
+badd +13 rebar.config
+badd +1 deps/astar/src/astar_behaviour_2.erl
+badd +13 apps/mants/src/beast_common.erl
+badd +9 apps/mants/include/creatures.hrl
+badd +218 ~/.vimrc
+badd +12 ~/.vim/bundle/vimerl/compiler/erlang_check.erl
+badd +14 apps/mants/src/ws2_handler.erl
+badd +31 apps/mants/src/mants_app.erl
+badd +27 apps/mants/src/mants_sup.erl
+silent! argdel *
+edit apps/mants/src/world_data_handler.erl
+set splitbelow splitright
+set nosplitbelow
+set nosplitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+let s:l = 111 - ((28 * winheight(0) + 18) / 37)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+111
+normal! 04|
+tabnext 1
+if exists('s:wipebuf')
+  silent exe 'bwipe ' . s:wipebuf
+endif
+unlet! s:wipebuf
+set winheight=1 winwidth=20 shortmess=filnxtToO
+let s:sx = expand("<sfile>:p:r")."x.vim"
+if file_readable(s:sx)
+  exe "source " . fnameescape(s:sx)
+endif
+let &so = s:so_save | let &siso = s:siso_save
+doautoall SessionLoadPost
+unlet SessionLoad
+" vim: set ft=vim :

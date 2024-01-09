@@ -1,0 +1,56 @@
+let SessionLoad = 1
+if &cp | set nocp | endif
+let s:so_save = &so | let s:siso_save = &siso | set so=0 siso=0
+let v:this_session=expand("<sfile>:p")
+silent only
+cd ~/work/wssiperl
+if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
+  let s:wipebuf = bufnr('%')
+endif
+set shortmess=aoO
+badd +148 apps/wssiperl/src/ws_handler.erl
+badd +15 apps/wssiperl/src/wssiperl_app.erl
+badd +36 rel/reltool.config
+badd +180 deps/cowboy/src/cowboy_websocket.erl
+badd +9 rebar.config
+badd +4 apps/wssiperl/src/sip_udp_worker.erl
+badd +25 rel/files/sys.config
+badd +66 webrtc2sip.examples.txt
+badd +9 wssiperl.example.txt
+badd +6 apps/wssiperl/src/wssip_test.erl
+badd +10 ../stuncheg/src/ice_lib.erl
+badd +65 wrtc2sip_dialog.txt
+badd +159 webrtc2sip.invite.txt
+badd +31 apps/wssiperl/src/wssip_utils.erl
+badd +39 deps/nksip/include/nksip.hrl
+badd +164 deps/nksip/src/nksip_unparse.erl
+badd +18 static/sm.html
+badd +14 static/sm_ifr.html
+silent! argdel *
+edit static/sm.html
+set splitbelow splitright
+set nosplitbelow
+set nosplitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+let s:l = 29 - ((24 * winheight(0) + 18) / 37)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+29
+normal! 069|
+tabnext 1
+if exists('s:wipebuf')
+  silent exe 'bwipe ' . s:wipebuf
+endif
+unlet! s:wipebuf
+set winheight=1 winwidth=20 shortmess=filnxtToO
+let s:sx = expand("<sfile>:p:r")."x.vim"
+if file_readable(s:sx)
+  exe "source " . fnameescape(s:sx)
+endif
+let &so = s:so_save | let &siso = s:siso_save
+doautoall SessionLoadPost
+unlet SessionLoad
+" vim: set ft=vim :
