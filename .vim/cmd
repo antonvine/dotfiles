@@ -19,3 +19,63 @@ PASSWORD=$(curl -s -X POST "https://secretsmanager.us-west-2.amazonaws.com/" -H 
 # Execute the F5-BIGIP commands to change admin password
 tmsh modify auth user admin password "$PASSWORD"
 tmsh save sys config
+
+
+
+#!/bin/bash
+
+# Get IAM credentials from metadata server
+TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s http://169.254.169.254/latest/api/token)
+ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/)
+CREDS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE)
+
+# Extract credentials
+ACCESS_KEY=$(echo $CREDS | grep -o '"AccessKeyId" : "[^"]*' | cut -d'"' -f4)
+SECRET_KEY=$(echo $CREDS | grep -o '"SecretAccessKey" : "[^"]*' | cut -d'"' -f4)
+SESSION_TOKEN=$(echo $CREDS | grep -o '"Token" : "[^"]*' | cut -d'"' -f4)
+
+# AWS request parameters
+REGION="us-west-2"
+SERVICE="secretsmanager"
+ENDPOINT="https://secretsmanager.${REGION}.amazonaws.com/"
+SECRET_ID="arn:aws:secretsmanager:us-west-2:123456789000:secret:my_secret-0QN5h6"
+HOST="secretsmanager.${REGION}.amazonaws.com"
+TARGET="secretsmanager.GetSecretValue"
+DATE=$(date -u +"%Y%m%dT%H%M%SZ")
+SHORT_DATE=$(date -u +"%Y%m%d")
+ALGORITHM="AWS4-HMAC-SHA256"
+CANONICAL_URI="/"
+CANONICAL_QUERYSTRING=""
+PAYLOAD="{\"SecretId\":\"$SECRET_ID\"}"
+PAYLOAD_HASH=$(echo -n "$PAYLOAD" | openssl dgst -sha256 | awk '{print $2}')
+SIGNED_HEADERS="content-type;host;x-amz-date;x-amz-security-token;x-amz-target"
+
+# Create canonical request
+CANONICAL_HEADERS="content-type:application/x-amz-json-1.1\nhost:$HOST\nx-amz-date:$DATE\nx-amz-security-token:$SESSION_TOKEN\nx-amz-target:$TARGET\n"
+CANONICAL_REQUEST="POST\n$CANONICAL_URI\n$CANONICAL_QUERYSTRING\n$CANONICAL_HEADERS\n$SIGNED_HEADERS\n$PAYLOAD_HASH"
+CANONICAL_REQUEST_HASH=$(echo -n "$CANONICAL_REQUEST" | openssl dgst -sha256 | awk '{print $2}')
+
+# Create string to sign
+STRING_TO_SIGN="$ALGORITHM\n$DATE\n$SHORT_DATE/$REGION/$SERVICE/aws4_request\n$CANONICAL_REQUEST_HASH"
+
+# Generate signing key
+DATE_KEY=$(echo -n "$SHORT_DATE" | openssl dgst -sha256 -hmac "AWS4$SECRET_KEY" -binary | xxd -p -c 256)
+REGION_KEY=$(echo -n "$REGION" | openssl dgst -sha256 -hmac "$(echo -n $DATE_KEY | xxd -r -p)" -binary | xxd -p -c 256)
+SERVICE_KEY=$(echo -n "$SERVICE" | openssl dgst -sha256 -hmac "$(echo -n $REGION_KEY | xxd -r -p)" -binary | xxd -p -c 256)
+SIGNING_KEY=$(echo -n "aws4_request" | openssl dgst -sha256 -hmac "$(echo -n $SERVICE_KEY | xxd -r -p)" -binary | xxd -p -c 256)
+SIGNATURE=$(echo -n "$STRING_TO_SIGN" | openssl dgst -sha256 -hmac "$(echo -n $SIGNING_KEY | xxd -r -p)" | awk '{print $2}')
+
+# Construct authorization header
+AUTHORIZATION_HEADER="$ALGORITHM Credential=$ACCESS_KEY/$SHORT_DATE/$REGION/$SERVICE/aws4_request, SignedHeaders=$SIGNED_HEADERS, Signature=$SIGNATURE"
+
+# Make the request with curl
+PASSWORD=$(curl -s -X POST "$ENDPOINT" \
+     -H "Content-Type: application/x-amz-json-1.1" \
+     -H "X-Amz-Date: $DATE" \
+     -H "X-Amz-Security-Token: $SESSION_TOKEN" \
+     -H "X-Amz-Target: $TARGET" \
+     -H "Authorization: $AUTHORIZATION_HEADER" \
+     -d "$PAYLOAD" | sed 's/.*"password":"\([^"]*\)".*/\1/')
+
+echo "Retrieved Password: $PASSWORD"
+
