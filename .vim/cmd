@@ -9,22 +9,9 @@ export TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s h
 export TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s http://169.254.169.254/latest/api/token) && export ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/) && export CREDS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE) && RESPONSE=$(curl -s -X POST "https://secretsmanager.us-west-2.amazonaws.com/" -H "Content-Type: application/x-amz-json-1.1" -H "X-Amz-Target: secretsmanager.GetSecretValue" -H "X-Amz-Security-Token: $(echo $CREDS | grep -o '"Token" : "[^"]*' | cut -d'"' -f4)" --aws-sigv4 "aws:amz:us-west-2:secretsmanager" --user "$(echo $CREDS | grep -o '"AccessKeyId" : "[^"]*' | cut -d'"' -f4):$(echo $CREDS | grep -o '"SecretAccessKey" : "[^"]*' | cut -d'"' -f4)" -d '{"SecretId":"arn:aws:secretsmanager:us-west-2:123456789000:secret:my_secret-0QN5h6"}') && echo "$RESPONSE" | awk -F'"SecretString":"' '{print $2}' | awk -F'","' '{print $1}' | sed 's/\\"/"/g'
 
 
-
-#!/bin/bash
-export TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s http://169.254.169.254/latest/api/token)
-export ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/)
-export CREDS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE)
-PASSWORD=$(curl -s -X POST "https://secretsmanager.us-west-2.amazonaws.com/" -H "Content-Type: application/x-amz-json-1.1" -H "X-Amz-Target: secretsmanager.GetSecretValue" -H "X-Amz-Security-Token: $(echo $CREDS | grep -o '"Token" : "[^"]*' | cut -d'"' -f4)" --aws-sigv4 "aws:amz:us-west-2:secretsmanager" --user "$(echo $CREDS | grep -o '"AccessKeyId" : "[^"]*' | cut -d'"' -f4):$(echo $CREDS | grep -o '"SecretAccessKey" : "[^"]*' | cut -d'"' -f4)" -d '{"SecretId":"arn:aws:secretsmanager:us-west-2:123456789000:secret:my_secret-0QN5h6"}' | sed 's/.*"password":"\([^"]*\)".*/\1/')
-
-# Execute the F5-BIGIP commands to change admin password
-tmsh modify auth user admin password "$PASSWORD"
-tmsh save sys config
-
-
-
 #!/bin/bash
 
-# Get IAM credentials from metadata server
+# Get IAM credentials from the metadata service
 TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s http://169.254.169.254/latest/api/token)
 ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/)
 CREDS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE)
@@ -59,11 +46,17 @@ CANONICAL_REQUEST_HASH=$(echo -n "$CANONICAL_REQUEST" | openssl dgst -sha256 | a
 STRING_TO_SIGN="$ALGORITHM\n$DATE\n$SHORT_DATE/$REGION/$SERVICE/aws4_request\n$CANONICAL_REQUEST_HASH"
 
 # Generate signing key
-DATE_KEY=$(echo -n "$SHORT_DATE" | openssl dgst -sha256 -hmac "AWS4$SECRET_KEY" -binary | xxd -p -c 256)
-REGION_KEY=$(echo -n "$REGION" | openssl dgst -sha256 -hmac "$(echo -n $DATE_KEY | xxd -r -p)" -binary | xxd -p -c 256)
-SERVICE_KEY=$(echo -n "$SERVICE" | openssl dgst -sha256 -hmac "$(echo -n $REGION_KEY | xxd -r -p)" -binary | xxd -p -c 256)
-SIGNING_KEY=$(echo -n "aws4_request" | openssl dgst -sha256 -hmac "$(echo -n $SERVICE_KEY | xxd -r -p)" -binary | xxd -p -c 256)
-SIGNATURE=$(echo -n "$STRING_TO_SIGN" | openssl dgst -sha256 -hmac "$(echo -n $SIGNING_KEY | xxd -r -p)" | awk '{print $2}')
+HMAC() {
+  echo -n "$2" | openssl dgst -sha256 -hmac "$1" -binary
+}
+
+DATE_KEY=$(HMAC "AWS4$SECRET_KEY" "$SHORT_DATE")
+REGION_KEY=$(HMAC "$DATE_KEY" "$REGION")
+SERVICE_KEY=$(HMAC "$REGION_KEY" "$SERVICE")
+SIGNING_KEY=$(HMAC "$SERVICE_KEY" "aws4_request")
+
+# Compute signature
+SIGNATURE=$(echo -n "$STRING_TO_SIGN" | openssl dgst -sha256 -hmac "$SIGNING_KEY" | awk '{print $2}')
 
 # Construct authorization header
 AUTHORIZATION_HEADER="$ALGORITHM Credential=$ACCESS_KEY/$SHORT_DATE/$REGION/$SERVICE/aws4_request, SignedHeaders=$SIGNED_HEADERS, Signature=$SIGNATURE"
