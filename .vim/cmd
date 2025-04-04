@@ -1,74 +1,79 @@
-curl -X POST "https://secretsmanager.us-west-2.amazonaws.com/" -H "Content-Type: application/x-amz-json-1.1" -H "X-Amz-Target: secretsmanager.GetSecretValue" -H "X-Amz-Security-Token: $(curl -s -H "X-aws-ec2-metadata-token: $(curl -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' -sL http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/iam/security-credentials/$(curl -s -H "X-aws-ec2-metadata-token: $(curl -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' -sL http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/iam/security-credentials/) | grep Token | cut -d '"' -f 4)" --aws-sigv4 "aws:amz:us-west-2:secretsmanager" --user "$(curl -s -H "X-aws-ec2-metadata-token: $(curl -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' -sL http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/iam/security-credentials/$(curl -s -H "X-aws-ec2-metadata-token: $(curl -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' -sL http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/iam/security-credentials/) | grep AccessKeyId | cut -d '"' -f 4):$(curl -s -H "X-aws-ec2-metadata-token: $(curl -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' -sL http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/iam/security-credentials/$(curl -s -H "X-aws-ec2-metadata-token: $(curl -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600' -sL http://169.254.169.254/latest/api/token)" http://169.254.169.254/latest/meta-data/iam/security-credentials/) | grep SecretAccessKey | cut -d '"' -f 4)" -d "{\"SecretId\":\"arn:aws:secretsmanager:us-west-2:123456789000:secret:my_secret-0QN5h6\"}" | jq -r '.SecretString'
+#cloud-config
+runcmd:
+  - |
+    #!/bin/bash
 
-TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s http://169.254.169.254/latest/api/token) && ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/) && CREDS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE) && AWS_ACCESS_KEY_ID=$(echo $CREDS | grep -o '"AccessKeyId" : "[^"]*' | cut -d'"' -f4) && AWS_SECRET_ACCESS_KEY=$(echo $CREDS | grep -o '"SecretAccessKey" : "[^"]*' | cut -d'"' -f4) && AWS_SESSION_TOKEN=$(echo $CREDS | grep -o '"Token" : "[^"]*' | cut -d'"' -f4) && aws secretsmanager get-secret-value --secret-id "arn:aws:secretsmanager:us-west-2:123456789000:secret:my_secret-0QN5h6" --region us-west-2 --query 'SecretString' --output text
+    set -e
 
-export TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s http://169.254.169.254/latest/api/token) && export ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/) && export CREDS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE) && curl -s -X POST "https://secretsmanager.us-west-2.amazonaws.com/" -H "Content-Type: application/x-amz-json-1.1" -H "X-Amz-Target: secretsmanager.GetSecretValue" -H "X-Amz-Security-Token: $(echo $CREDS | grep -o '"Token" : "[^"]*' | cut -d'"' -f4)" --aws-sigv4 "aws:amz:us-west-2:secretsmanager" --user "$(echo $CREDS | grep -o '"AccessKeyId" : "[^"]*' | cut -d'"' -f4):$(echo $CREDS | grep -o '"SecretAccessKey" : "[^"]*' | cut -d'"' -f4)" -d '{"SecretId":"arn:aws:secretsmanager:us-west-2:123456789000:secret:my_secret-0QN5h6"}'
+    SECRET_NAME="your-secret-name"
+    AWS_REGION="us-east-1"
 
-export TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s http://169.254.169.254/latest/api/token) && export ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/) && export CREDS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE) && curl -s -X POST "https://secretsmanager.us-west-2.amazonaws.com/" -H "Content-Type: application/x-amz-json-1.1" -H "X-Amz-Target: secretsmanager.GetSecretValue" -H "X-Amz-Security-Token: $(echo $CREDS | grep -o '"Token" : "[^"]*' | cut -d'"' -f4)" --aws-sigv4 "aws:amz:us-west-2:secretsmanager" --user "$(echo $CREDS | grep -o '"AccessKeyId" : "[^"]*' | cut -d'"' -f4):$(echo $CREDS | grep -o '"SecretAccessKey" : "[^"]*' | cut -d'"' -f4)" -d '{"SecretId":"arn:aws:secretsmanager:us-west-2:123456789000:secret:my_secret-0QN5h6"}' | grep -o '"SecretString":"[^"]*"' | cut -d':' -f2 | sed 's/^"//;s/"$//'
+    # Retrieve instance role credentials
+    TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+    ROLE_NAME=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+        http://169.254.169.254/latest/meta-data/iam/security-credentials/)
+    CREDS_JSON=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+        http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE_NAME)
 
-export TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s http://169.254.169.254/latest/api/token) && export ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/) && export CREDS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE) && RESPONSE=$(curl -s -X POST "https://secretsmanager.us-west-2.amazonaws.com/" -H "Content-Type: application/x-amz-json-1.1" -H "X-Amz-Target: secretsmanager.GetSecretValue" -H "X-Amz-Security-Token: $(echo $CREDS | grep -o '"Token" : "[^"]*' | cut -d'"' -f4)" --aws-sigv4 "aws:amz:us-west-2:secretsmanager" --user "$(echo $CREDS | grep -o '"AccessKeyId" : "[^"]*' | cut -d'"' -f4):$(echo $CREDS | grep -o '"SecretAccessKey" : "[^"]*' | cut -d'"' -f4)" -d '{"SecretId":"arn:aws:secretsmanager:us-west-2:123456789000:secret:my_secret-0QN5h6"}') && echo "$RESPONSE" | awk -F'"SecretString":"' '{print $2}' | awk -F'","' '{print $1}' | sed 's/\\"/"/g'
+    AWS_ACCESS_KEY_ID=$(echo "$CREDS_JSON" | grep -oP '(?<="AccessKeyId" : ")[^"]+')
+    AWS_SECRET_ACCESS_KEY=$(echo "$CREDS_JSON" | grep -oP '(?<="SecretAccessKey" : ")[^"]+')
+    AWS_SESSION_TOKEN=$(echo "$CREDS_JSON" | grep -oP '(?<="Token" : ")[^"]+')
 
+    # Prepare request to Secrets Manager API
+    REQUEST_PAYLOAD="{\"SecretId\": \"$SECRET_NAME\"}"
+    DATE=$(date -u "+%Y%m%dT%H%M%SZ")
+    DATE_SHORT=$(date -u "+%Y%m%d")
+    SERVICE="secretsmanager"
+    HOST="secretsmanager.${AWS_REGION}.amazonaws.com"
+    ENDPOINT="https://${HOST}"
+    TARGET="secretsmanager.GetSecretValue"
 
-#!/bin/bash
+    # Generate canonical request
+    CANONICAL_REQUEST=$(printf "POST\n/\n\nhost:%s\nx-amz-date:%s\nx-amz-security-token:%s\nx-amz-target:%s\n\nhost;x-amz-date;x-amz-security-token;x-amz-target\n%s" \
+        "$HOST" "$DATE" "$AWS_SESSION_TOKEN" "$TARGET" \
+        "$(printf '%s' "$REQUEST_PAYLOAD" | sha256sum | awk '{print $1}')")
 
-# Get IAM credentials from the metadata service
-TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" -s http://169.254.169.254/latest/api/token)
-ROLE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/)
-CREDS=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/iam/security-credentials/$ROLE)
+    # Generate string to sign
+    CREDENTIAL_SCOPE="${DATE_SHORT}/${AWS_REGION}/${SERVICE}/aws4_request"
+    STRING_TO_SIGN=$(printf "AWS4-HMAC-SHA256\n%s\n%s\n%s" \
+        "$DATE" "$CREDENTIAL_SCOPE" \
+        "$(printf '%s' "$CANONICAL_REQUEST" | sha256sum | awk '{print $1}')")
 
-# Extract credentials
-ACCESS_KEY=$(echo $CREDS | grep -o '"AccessKeyId" : "[^"]*' | cut -d'"' -f4)
-SECRET_KEY=$(echo $CREDS | grep -o '"SecretAccessKey" : "[^"]*' | cut -d'"' -f4)
-SESSION_TOKEN=$(echo $CREDS | grep -o '"Token" : "[^"]*' | cut -d'"' -f4)
+    # Compute signature
+    function hmac_sha256() {
+      key="$1"
+      data="$2"
+      printf '%s' "$data" | openssl dgst -binary -sha256 -mac HMAC -macopt "key:$key"
+    }
 
-# AWS request parameters
-REGION="us-west-2"
-SERVICE="secretsmanager"
-ENDPOINT="https://secretsmanager.${REGION}.amazonaws.com/"
-SECRET_ID="arn:aws:secretsmanager:us-west-2:123456789000:secret:my_secret-0QN5h6"
-HOST="secretsmanager.${REGION}.amazonaws.com"
-TARGET="secretsmanager.GetSecretValue"
-DATE=$(date -u +"%Y%m%dT%H%M%SZ")
-SHORT_DATE=$(date -u +"%Y%m%d")
-ALGORITHM="AWS4-HMAC-SHA256"
-CANONICAL_URI="/"
-CANONICAL_QUERYSTRING=""
-PAYLOAD="{\"SecretId\":\"$SECRET_ID\"}"
-PAYLOAD_HASH=$(echo -n "$PAYLOAD" | openssl dgst -sha256 | awk '{print $2}')
-SIGNED_HEADERS="content-type;host;x-amz-date;x-amz-security-token;x-amz-target"
+    K_DATE=$(hmac_sha256 "AWS4${AWS_SECRET_ACCESS_KEY}" "${DATE_SHORT}")
+    K_REGION=$(hmac_sha256 "$K_DATE" "${AWS_REGION}")
+    K_SERVICE=$(hmac_sha256 "$K_REGION" "${SERVICE}")
+    K_SIGNING=$(hmac_sha256 "$K_SERVICE" "aws4_request")
+    SIGNATURE=$(printf '%s' "$STRING_TO_SIGN" | openssl dgst -sha256 -mac HMAC -macopt hexkey:$(echo -n "$K_SIGNING" | xxd -p -c 256) | awk '{print $2}')
 
-# Create canonical request
-CANONICAL_HEADERS="content-type:application/x-amz-json-1.1\nhost:$HOST\nx-amz-date:$DATE\nx-amz-security-token:$SESSION_TOKEN\nx-amz-target:$TARGET\n"
-CANONICAL_REQUEST="POST\n$CANONICAL_URI\n$CANONICAL_QUERYSTRING\n$CANONICAL_HEADERS\n$SIGNED_HEADERS\n$PAYLOAD_HASH"
-CANONICAL_REQUEST_HASH=$(echo -n "$CANONICAL_REQUEST" | openssl dgst -sha256 | awk '{print $2}')
+    AUTH_HEADER="AWS4-HMAC-SHA256 Credential=${AWS_ACCESS_KEY_ID}/${CREDENTIAL_SCOPE}, SignedHeaders=host;x-amz-date;x-amz-security-token;x-amz-target, Signature=${SIGNATURE}"
 
-# Create string to sign
-STRING_TO_SIGN="$ALGORITHM\n$DATE\n$SHORT_DATE/$REGION/$SERVICE/aws4_request\n$CANONICAL_REQUEST_HASH"
+    # Call Secrets Manager
+    RESPONSE=$(curl -s -X POST "$ENDPOINT" \
+        -H "Content-Type: application/x-amz-json-1.1" \
+        -H "X-Amz-Date: $DATE" \
+        -H "X-Amz-Security-Token: $AWS_SESSION_TOKEN" \
+        -H "X-Amz-Target: $TARGET" \
+        -H "Authorization: $AUTH_HEADER" \
+        -d "$REQUEST_PAYLOAD")
 
-# Generate signing key
-HMAC() {
-  echo -n "$2" | openssl dgst -sha256 -hmac "$1" -binary
-}
+    # Extract secret (assuming secret is stored as plaintext directly)
+    PASSWORD=$(echo "$RESPONSE" | sed -n 's/.*"SecretString":"\([^"]*\)".*/\1/p')
 
-DATE_KEY=$(HMAC "AWS4$SECRET_KEY" "$SHORT_DATE")
-REGION_KEY=$(HMAC "$DATE_KEY" "$REGION")
-SERVICE_KEY=$(HMAC "$REGION_KEY" "$SERVICE")
-SIGNING_KEY=$(HMAC "$SERVICE_KEY" "aws4_request")
+    if [[ -z "$PASSWORD" ]]; then
+      echo "Failed to retrieve secret value!"
+      exit 1
+    fi
 
-# Compute signature
-SIGNATURE=$(echo -n "$STRING_TO_SIGN" | openssl dgst -sha256 -hmac "$SIGNING_KEY" | awk '{print $2}')
+    # Update admin user password
+    echo "admin:$PASSWORD" | chpasswd
 
-# Construct authorization header
-AUTHORIZATION_HEADER="$ALGORITHM Credential=$ACCESS_KEY/$SHORT_DATE/$REGION/$SERVICE/aws4_request, SignedHeaders=$SIGNED_HEADERS, Signature=$SIGNATURE"
-
-# Make the request with curl
-PASSWORD=$(curl -s -X POST "$ENDPOINT" \
-     -H "Content-Type: application/x-amz-json-1.1" \
-     -H "X-Amz-Date: $DATE" \
-     -H "X-Amz-Security-Token: $SESSION_TOKEN" \
-     -H "X-Amz-Target: $TARGET" \
-     -H "Authorization: $AUTHORIZATION_HEADER" \
-     -d "$PAYLOAD" | sed 's/.*"password":"\([^"]*\)".*/\1/')
-
-echo "Retrieved Password: $PASSWORD"
+    echo "Password successfully updated."
 
